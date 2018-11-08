@@ -69,3 +69,4 @@ service-key.json
 
 # IDE
 .vscode/
+.idea/

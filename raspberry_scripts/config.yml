@@ -1,0 +1,2 @@
+firebaseUrl: 'https://intelligent-house-test.firebaseio.com/'
+serviceKeyFile: '../service-key.json'
