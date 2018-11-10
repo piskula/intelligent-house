@@ -1,2 +1,12 @@
 firebaseUrl: 'https://intelligent-house-test.firebaseio.com/'
 serviceKeyFile: '../service-key.json'
+delays:
+  temperature: 30
+sensors:
+  temperature:
+    temp_room_1:
+      # path: /sys/bus/w1/devices/28-0117b34369ff/w1_slave
+      path: w1_slave
+    temp_room_2:
+      # path: /sys/bus/w1/devices/28-0117b34369ff/w1_slave
+      path: w2_slave

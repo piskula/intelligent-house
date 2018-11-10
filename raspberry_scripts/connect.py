@@ -1,24 +1,11 @@
-import time
-import re
 import yaml
-import firebase_admin
-from firebase_admin import credentials, db
+import os
 
 with open("./config.yml", 'r') as ymlfile:
   cfg = yaml.load(ymlfile)
 
-cred = credentials.Certificate(cfg['serviceKeyFile'])
-firebase_admin.initialize_app(cred, {
-  'databaseURL': cfg['firebaseUrl']
-})
+temperatureSensorDelay = cfg['delays']['temperature']
 
-root = db.reference()
-
-while True:
-  time.sleep(4)
-  file_temp_room_1 = open('w1_slave', 'r').read(90)
-  value = float(re.compile('t=([\d]{3,6})').findall(file_temp_room_1)[0])
-
-  root.child('data').child('temp_room_01').push({
-    'value': value
-  })
+for temperatureSensor in cfg['sensors']['temperature']:
+  pathToFile = cfg['sensors']['temperature'][temperatureSensor]['path']
+  os.system(f'nohup python3 -u temperature.py {pathToFile} {temperatureSensorDelay} {temperatureSensor} &')
