@@ -16,7 +16,8 @@ sensorName = sys.argv[3]
 
 def log(msg):
   current_time = strftime("%Y-%m-%d %H:%M:%S.%m", gmtime())
-  print(f'{current_time} {sys.argv[0]} {inputFile} -> {msg}')
+  # print(f'{current_time} {sys.argv[0]} {inputFile} -> {msg}')
+  print(current_time + ' ' + sys.argv[0] + ' ' + inputFile + ' -> ' + msg)
 
 with open("./config.yml", 'r') as ymlfile:
   cfg = yaml.load(ymlfile)
@@ -27,7 +28,8 @@ firebase_admin.initialize_app(
 )
 
 root = db.reference()
-log(f'Script started for: {inputFile}')
+# log(f'Script started for: {inputFile}')
+log('Script started for ' + inputFile)
 
 while True:
   sleep(int(sys.argv[2]))
@@ -35,7 +37,8 @@ while True:
   try:
     file_temp_room_1 = open(inputFile, 'r').read(90)
   except FileNotFoundError:
-    log(f'FileNotFound: {inputFile}')
+    # log(f'FileNotFound: {inputFile}')
+    log('FileNotFound: ' + inputFile)
     continue
 
   value = float(re.compile('t=([\d]{3,6})').findall(file_temp_room_1)[0])
