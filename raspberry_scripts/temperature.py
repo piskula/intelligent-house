@@ -42,7 +42,7 @@ while True:
     continue
 
   value = float(re.compile('t=([\d]{3,6})').findall(file_temp_room_1)[0])
-  # log(f'Value: {value / 1000}')
+  log('Value: ' + string(value / 1000))
   root.child('data').child(sensorName).push({
     'value': value / 1000
   })
