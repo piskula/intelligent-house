@@ -19,7 +19,7 @@ def log(msg):
   # print(f'{current_time} {sys.argv[0]} {inputFile} -> {msg}')
   print(current_time + ' ' + sys.argv[0] + ' ' + inputFile + ' -> ' + msg)
 
-with open("./config.yml", 'r') as ymlfile:
+with open("/home/pi/intelligent-house/raspberry_scripts/config.yml", 'r') as ymlfile:
   cfg = yaml.load(ymlfile)
 
 firebase_admin.initialize_app(
