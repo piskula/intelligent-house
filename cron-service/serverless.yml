@@ -67,7 +67,7 @@ functions:
 #          method: get
 #      - s3: ${env:BUCKET}
       - schedule:
-          rate: cron(*/5 * * * ? *)
+          rate: cron(*/15 * * * ? *)
           enabled: true
 #      - sns: greeter-topic
 #      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000

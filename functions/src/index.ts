@@ -70,7 +70,12 @@ exports.refreshStatus = functions.https.onRequest((request, response) => {
           const deadSensorList = getListOfDeadSensors(lastValues, threshold);
           admin.database().ref(ERROR_DB).update(deadSensorList)
             .then(() => {
-              response.send('Found ' + JSON.stringify(deadSensorList));
+
+              admin.database().ref('lastDeathThresholdCheck')
+                .set(new Date().getTime())
+                .catch(err => console.error(err));
+              response.send(deadSensorList);
+
             })
             .catch(err => console.error(err));
         })
