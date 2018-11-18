@@ -84,20 +84,35 @@ exports.refreshStatus = functions.https.onRequest((request, response) => {
     .catch(err => console.error(err));
 });
 
-exports.sendNotification = functions.https.onRequest((req, res) => {
-  const payload: MessagingPayload = {
-    data: {
-      title: 'Mojko',
-      subtitle: 'Hopko',
-    },
-  };
-
-  admin.database().ref().child("firebaseId")
+/*
+ * This trigger notify device with each change in ERROR_DB database (when some sensor die or come alive)
+ */
+exports.sendErrorNotification = functions.database.ref(ERROR_DB).onWrite(ev => {
+  admin.database().ref().child(ERROR_DB)
     .once('value')
-    .then(snapshot => {
-      admin.messaging().sendToDevice(snapshot.val(), payload)
-        .then(() => res.send("OK"))
-        .catch(err => res.status(500).send("Error occurred while sending notification"));
+    .then(errors => {
+      const errorSensorIds: String[] = [];
+
+      errors.forEach(err => {
+        errorSensorIds.push(err.key);
+        return false;
+      });
+
+      const payload: MessagingPayload = {
+        data: {
+          title: 'Mojko',
+          subtitle: JSON.stringify(errorSensorIds),
+        },
+      };
+
+      admin.database().ref().child("firebaseId")
+        .once('value')
+        .then(snapshot => {
+          admin.messaging().sendToDevice(snapshot.val(), payload)
+            .catch(err => console.error(err));
+          return ev;
+        })
+        .catch(err => console.error(err));
     })
-    .catch(err => res.status(500).send("App has not been installed yet (firebaseId not available)"));
+    .catch(err => console.error(err));
 });
