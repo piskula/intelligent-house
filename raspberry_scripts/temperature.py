@@ -8,7 +8,7 @@ from firebase_admin import credentials, db
 # List of args
 # 0: script file name
 # 1: sensor input file
-# 2: delay
+# 2: delay in minutes
 # 3: name of sensor
 
 inputFile = sys.argv[1]
@@ -32,7 +32,7 @@ root = db.reference()
 log('Script started for ' + inputFile)
 
 while True:
-  sleep(int(sys.argv[2]))
+  sleep(int(sys.argv[2]) * 60)
 
   try:
     file_temp_room_1 = open(inputFile, 'r').read(90)
