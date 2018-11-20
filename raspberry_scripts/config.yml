@@ -1,5 +1,6 @@
 firebaseUrl: 'https://intelligent-house-test.firebaseio.com/'
 serviceKeyFile: '/home/pi/intelligent-house/service-key.json'
+dataTable: 'data_temp'
 delays:
   temperature: 15
 sensors:

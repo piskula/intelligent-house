@@ -22,6 +22,4 @@ firebase_admin.initialize_app(
 
 root = db.reference()
 
-root.child('data').child(sensorName).push({
-  'value': value
-})
+root.child(cfg['dataTable']).child(sensorName).push(value)
