@@ -2,86 +2,140 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import MessagingPayload = admin.messaging.MessagingPayload;
 import DataSnapshot = admin.database.DataSnapshot;
+import * as moment from 'moment';
 
 admin.initializeApp();
 
 const ERROR_DB = 'activeErrorNotification';
+const DATA_TABLE = 'data';
+const DATA_TEMPORARY_TABLE = 'data_temp';
 
-
-const getLastValues = function (): Promise<DataSnapshot[]> {
+const getLastDayForEachSensor = function (): Promise<DataSnapshot[]> {
   return admin.database().ref().child('data')
     .once('value')
     .then(data => {
-      const lastValues: Promise<DataSnapshot>[] = [];
+      const lastDays: Promise<DataSnapshot>[] = [];
 
       data.forEach(sensor => {
         const sensorId = sensor.key;
-        const promiseLastValue: Promise<DataSnapshot> = admin.database().ref().child('/data/' + sensorId)
-          .orderByChild("timestamp")
+        const promiseLastDay: Promise<DataSnapshot> = admin.database().ref().child('/data/' + sensorId)
+          .orderByKey()
           .limitToLast(1)
           .once('value');
 
-        lastValues.push(promiseLastValue);
+        lastDays.push(promiseLastDay);
         return false;
       });
 
-      return Promise.all(lastValues);
+      return Promise.all(lastDays);
     });
 };
 
-const getListOfDeadSensors = function (data: DataSnapshot[], threshold: number): Object {
-  const myErrorMap = {};
-  data.forEach(lastValue => {
-    const sensorId = lastValue.key;
+interface CustomResponse {
+  promises: Promise<DataSnapshot[]>;
+  sensors: string[];
+}
 
-    lastValue.forEach(_value => {
-      if (_value.val().timestamp < threshold) {
-        myErrorMap[sensorId] = '';
+const getLastTimestampAndValueForEachSensor = function (lastDaysMap: Map<string, string>): CustomResponse {
+  const lastDays: Promise<DataSnapshot>[] = [];
+  const sensorList: string[] = [];
+  lastDaysMap.forEach((value, key) => {
+    const promiseLastDay: Promise<DataSnapshot> = admin.database().ref().child('/data/' + key + '/' + value)
+      .orderByKey()
+      .limitToLast(1)
+      .once('value');
+
+    lastDays.push(promiseLastDay);
+    sensorList.push(key);
+  });
+  return {promises: Promise.all(lastDays), sensors: sensorList} as CustomResponse;
+};
+
+const getDeathThreshold = function (): Promise<number> {
+  return admin.database().ref().child("deathThreshold")
+    .once('value')
+    .then(deathThresholdInMinutes => {
+      return new Date().getTime() - deathThresholdInMinutes.val() * 60 * 1000;
+    });
+};
+
+const filterDeadSensors = function (possibleErrors: DataSnapshot[], sensors: string[]): Promise<Object> {
+  return getDeathThreshold().then(threshold => {
+    const myErrorMap = {};
+    possibleErrors.forEach((possibleError, i) => {
+      const value = possibleError.val(); // { "1542724863667": 22.687 }
+      const timestampToCheck: number = parseInt(Object.keys(value)[0]);
+
+      if (timestampToCheck < threshold) {
+        myErrorMap[sensors[i]] = timestampToCheck;  // {.., "temp_room_1": "1542724863667", ..}
       }
+    });
+    return myErrorMap;
+  });
+};
+
+const getActualErrorSensors = function (data: DataSnapshot[]): Promise<Object> {
+  // this map gives you last day for each sensor
+  const lastDaysMap: Map<string, string> = new Map();
+
+  // first we have to realize, which day is the last for given sensor
+  data.forEach(lastDay => {
+    const sensorId = lastDay.key;
+    lastDay.forEach(_value => {
+      const sensorLastDayId = _value.key; // like 2018-11-20
+      lastDaysMap.set(sensorId, sensorLastDayId); // "like temp_room_1" -> "2018-11-20"
       return true;
     });
   });
 
-  return myErrorMap;
+  // then we get last value for each
+  const response: CustomResponse = getLastTimestampAndValueForEachSensor(lastDaysMap);
+  return response.promises
+  // and then we take only sensors, whose last timestamp is before our threshold and return them as Promise
+    .then(possibleErrors => filterDeadSensors(possibleErrors, response.sensors));
 };
 
 /*
  * This trigger add timestamp to every value (on Raspberry Pi we cannot guarantee correct time sync)
  */
-exports.fillTimestamp = functions.database.ref('/data/{sensorId}/{pushId}').onCreate((snapshot, context) => {
-  admin.database().ref(ERROR_DB)
-    .child(context.params.sensorId)
-    .remove()
-    .catch(err => console.log(err));
+exports.fillTimestamp = functions.database.ref(`/${DATA_TEMPORARY_TABLE}/{sensorId}/{pushId}`)
+  .onCreate((snapshot, context) => {
+    admin.database().ref(ERROR_DB)
+      .child(context.params.sensorId)
+      .remove()
+      .catch(err => console.error(new Error(err)));
 
-  return snapshot.ref
-    .child('timestamp')
-    .set(admin.database.ServerValue.TIMESTAMP);
-});
+    const dayKey: string = moment().format("YYYY-MM-DD");
+
+    admin.database().ref(DATA_TABLE)
+      .child(context.params.sensorId)
+      .child(dayKey)
+      .child(`/${new Date().getTime()}`)
+      .set(snapshot.val())
+      .catch(err => console.error(new Error(err)));
+
+    return snapshot.ref.remove()
+      .catch(err => console.error(new Error(err)));
+  });
 
 exports.refreshStatus = functions.https.onRequest((request, response) => {
-  admin.database().ref().child("deathThreshold")
-    .once('value')
-    .then(deathThresholdInMinutes => {
-      const threshold = new Date().getTime() - deathThresholdInMinutes.val() * 60 * 1000;
 
-      getLastValues()
-        .then((lastValues: DataSnapshot[]) => {
-          const deadSensorList = getListOfDeadSensors(lastValues, threshold);
-          admin.database().ref(ERROR_DB).update(deadSensorList)
-            .then(() => {
+  getLastDayForEachSensor().then((lastDays: DataSnapshot[]) => {
 
-              admin.database().ref('lastDeathThresholdCheck')
-                .set(new Date().getTime())
-                .catch(err => console.error(err));
-              response.send(deadSensorList);
+    getActualErrorSensors(lastDays).then(deadSensorList => {
 
-            })
-            .catch(err => console.error(err));
-        })
-        .catch(err => console.error(err));
-    })
-    .catch(err => console.error(err));
+      // update active error DB, from which notifications are sent
+      admin.database().ref(ERROR_DB).update(deadSensorList).then(() => {
+
+        // and then update last check timestamp
+        admin.database().ref('lastDeathThresholdCheck')
+          .set(new Date().getTime())
+          .catch(err => console.error(err));
+        response.send(deadSensorList);
+
+      }).catch(err => console.error(err));
+    }).catch(err => console.error(err));
+  }).catch(err => console.error(err));
 });
 
 /*
@@ -109,10 +163,10 @@ exports.sendErrorNotification = functions.database.ref(ERROR_DB).onWrite(ev => {
         .once('value')
         .then(snapshot => {
           admin.messaging().sendToDevice(snapshot.val(), payload)
-            .catch(err => console.error(err));
+            .catch(err => console.error(new Error(err)));
           return ev;
         })
-        .catch(err => console.error(err));
+        .catch(err => console.error(new Error(err)));
     })
-    .catch(err => console.error(err));
+    .catch(err => console.error(new Error(err)));
 });
