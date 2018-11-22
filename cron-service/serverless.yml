@@ -9,5 +9,5 @@ functions:
     handler: handler.hello
     events:
       - schedule:
-          rate: cron(*/15 * * * ? *)
+          rate: cron(*/20 * * * ? *)
           enabled: true

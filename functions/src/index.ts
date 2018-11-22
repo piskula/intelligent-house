@@ -142,7 +142,7 @@ exports.refreshStatus = functions.https.onRequest((request, response) => {
  * This trigger notify device with each change in ERROR_DB database (when some sensor die or come alive)
  */
 exports.sendErrorNotification = functions.database.ref(ERROR_DB).onWrite(ev => {
-  admin.database().ref().child(ERROR_DB)
+  return admin.database().ref().child(ERROR_DB)
     .once('value')
     .then(errors => {
       const errorSensorIds: String[] = [];
@@ -152,6 +152,8 @@ exports.sendErrorNotification = functions.database.ref(ERROR_DB).onWrite(ev => {
         return false;
       });
 
+      console.log(errorSensorIds);
+
       const payload: MessagingPayload = {
         data: {
           title: 'Mojko',
@@ -159,14 +161,12 @@ exports.sendErrorNotification = functions.database.ref(ERROR_DB).onWrite(ev => {
         },
       };
 
-      admin.database().ref().child("firebaseId")
+      return admin.database().ref().child("firebaseId")
         .once('value')
-        .then(snapshot => {
-          admin.messaging().sendToDevice(snapshot.val(), payload)
+        .then(firebaseId => {
+          admin.messaging().sendToDevice(firebaseId.val(), payload)
             .catch(err => console.error(new Error(err)));
-          return ev;
         })
         .catch(err => console.error(new Error(err)));
-    })
-    .catch(err => console.error(new Error(err)));
+    });
 });
