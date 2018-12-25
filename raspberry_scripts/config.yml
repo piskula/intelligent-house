@@ -3,9 +3,13 @@ serviceKeyFile: '/home/pi/intelligent-house/service-key.json'
 dataTable: 'data_temp'
 delays:
   temperature: 15
+  humidity: 15
 sensors:
   temperature:
     temp_room_2:
       path: /sys/bus/w1/devices/28-00000a33a888/w1_slave
     temp_room_1:
       path: /sys/bus/w1/devices/28-0117b34369ff/w1_slave
+  humidity:
+    humidity_1: 23
+
